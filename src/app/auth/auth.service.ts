@@ -1,21 +1,47 @@
-import { Injectable, Signal, effect, signal } from '@angular/core';
+import { Injectable, Signal, computed, effect, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { BehaviorSubject, Subject } from 'rxjs';
+
+export type AuthState = {
+  accessToken: string | null;
+}
+
+const initialState: AuthState = {
+  accessToken: null
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  
-  token = signal<string | null>(null);
+
+  // state
+  private state = signal<AuthState>(initialState);
+
+  // selectors
+  token = computed(() => this.state().accessToken);
+  isAuthorized = computed(() => !!this.token);
+
+  // events
+  tokenUpdated$ = new Subject<string | null>();
+
+  // effects
   logToken = effect(() => console.log('access_token:  ' + this.token()));
 
-  setAccessToken(access_token: string): void {
-    if (access_token?.length > 0) {
-      this.token.set(access_token);
-    } else {
-      this.token.set(null);
-    }
+
+  constructor() {
+    // reducers
+    this.tokenUpdated$.pipe(takeUntilDestroyed()).subscribe((token: string | null) => {
+      this.state.update(currentState => ({ ...currentState, accessToken: token }));
+    })
   }
 
+  // actions
+  setAccessToken(token: string | null): void {
+    this.tokenUpdated$.next(token);
+  }
+
+  // helper functions
   redirectToSignIn() {
     const token = '';
     const scopes = 'user-read,user-write,account-read';
